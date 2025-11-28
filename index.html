@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WMAA Staff Scheduler</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.webmanifest" />
+
+  <!-- Basic styling -->
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg: #0f172a;
+      --card: #111827;
+      --accent: #22c55e;
+      --accent-muted: #4ade80;
+      --border: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --danger: #f97373;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #1f2937 0, #020617 50%);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    header {
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      background: rgba(15, 23, 42, 0.9);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header .title {
+      display: flex;
+      flex-direction: column;
+    }
+    header .title span:first-child {
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    header .title span:last-child {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    header .controls {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    select, button, input {
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text);
+      padding: 0.3rem 0.7rem;
+      font-size: 0.85rem;
+    }
+    button {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent-muted);
+      color: #022c22;
+      font-weight: 600;
+    }
+    main {
+      padding: 1rem;
+      display: grid;
+      grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.3fr);
+      gap: 1rem;
+    }
+    @media (max-width: 900px) {
+      main { grid-template-columns: minmax(0, 1fr); }
+    }
+    .card {
+      background: var(--card);
+      border-radius: 1rem;
+      border: 1px solid var(--border);
+      padding: 0.75rem;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .card-header h2 {
+      margin: 0;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+    .pill-row {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+    .pill {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: 0.15rem 0.6rem;
+      font-size: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: var(--muted);
+    }
+    .pill span.dot {
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 999px;
+    }
+    .calendar-grid {
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      font-size: 0.75rem;
+    }
+    .calendar-header-row,
+    .calendar-row {
+      display: grid;
+      grid-template-columns: 80px repeat(7, minmax(0, 1fr));
+      border-bottom: 1px solid var(--border);
+    }
+    .calendar-header-cell,
+    .calendar-cell-label {
+      padding: 0.35rem 0.4rem;
+      text-align: center;
+      background: #020617;
+      color: var(--muted);
+      border-right: 1px solid var(--border);
+    }
+    .calendar-header-cell:last-child,
+    .calendar-cell:last-child {
+      border-right: none;
+    }
+    .calendar-row:last-child {
+      border-bottom: none;
+    }
+    .calendar-row-label {
+      padding: 0.3rem 0.4rem;
+      border-right: 1px solid var(--border);
+      background: #030712;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 0.25rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .calendar-cell {
+      border-right: 1px solid var(--border);
+      padding: 0.2rem;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .calendar-cell span.badge {
+      font-weight: 600;
+      font-size: 0.8rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+    }
+    .weekday-label {
+      font-weight: 600;
+    }
+    .weekday-weekend {
+      color: #fdba74;
+    }
+    .small {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .staff-select {
+      width: 100%;
+      margin-bottom: 0.5rem;
+    }
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      max-height: 420px;
+      overflow-y: auto;
+      padding-right: 0.3rem;
+    }
+    .shift-item {
+      border-radius: 0.7rem;
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #020617;
+      font-size: 0.75rem;
+    }
+    .shift-item .meta {
+      display: flex;
+      flex-direction: column;
+    }
+    .shift-item .meta span:first-child {
+      font-weight: 600;
+    }
+    .shift-item .meta span:last-child {
+      color: var(--muted);
+      font-size: 0.7rem;
+    }
+    .chip {
+      border-radius: 999px;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.7rem;
+      border: 1px solid var(--border);
+      background: #020617;
+    }
+    .chip.lead { border-color: var(--accent-muted); color: var(--accent-muted); }
+    .chip.location-h { border-color: #60a5fa; color: #60a5fa; }
+    .chip.location-f { border-color: #f97373; color: #f97373; }
+    .toast {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: #022c22;
+      color: #bbf7d0;
+      padding: 0.5rem 0.8rem;
+      border-radius: 999px;
+      border: 1px solid #16a34a;
+      font-size: 0.75rem;
+      display: none;
+      z-index: 50;
+    }
+    .toast.show {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <span>WMAA STAFF SCHEDULER</span>
+      <span>Multi-location · Auto-generated · PWA</span>
+    </div>
+    <div class="controls">
+      <button id="prevMonthBtn">&lt;</button>
+      <span id="monthLabel" class="small"></span>
+      <button id="nextMonthBtn">&gt;</button>
+      <button id="generateBtn" class="primary">Auto-generate Month</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Manager calendar view -->
+    <section class="card">
+      <div class="card-header">
+        <h2>Manager View</h2>
+        <span class="small">Hazelwood &amp; Florissant · Month grid</span>
+      </div>
+
+      <div class="pill-row" id="legendRow">
+        <!-- Filled dynamically based on staff -->
+      </div>
+
+      <div class="calendar-grid" id="calendarGrid">
+        <!-- Filled dynamically -->
+      </div>
+
+      <div class="small" style="margin-top:0.35rem;">
+        Rules: Florissant = 1 Lead + 0–1 staff · Hazelwood = 1 Lead + 2–3 staff · 1 Lead per location, per day.
+      </div>
+    </section>
+
+    <!-- Staff personal view -->
+    <section class="card">
+      <div class="card-header">
+        <h2>Staff View</h2>
+        <span class="small">See my upcoming shifts</span>
+      </div>
+
+      <select id="staffSelect" class="staff-select"></select>
+
+      <div class="list" id="staffShiftList">
+        <!-- Filled dynamically -->
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast">
+    <span>✅ Schedule generated</span>
+    <span class="small">Saved locally on this device.</span>
+  </div>
+
+  <script>
+    // ---------- DATA SETUP ----------
+
+    const STAFF = [
+      {
+        id: "master_d",
+        name: "Master D",
+        isLead: true,
+        maxHoursPerWeek: 24,
+        color: "#FFB3BA",
+        availability: {
+          Mon: { H: true, F: true },
+          Tue: { H: true, F: true },
+          Wed: { H: true, F: true },
+          Thu: { H: true, F: true },
+          Fri: { H: true, F: true },
+          Sat: { H: true, F: true },
+          Sun: { H: false, F: false }
+        }
+      },
+      {
+        id: "master_jen",
+        name: "Master Jen",
+        isLead: true,
+        maxHoursPerWeek: 8,
+        color: "#BAFFC9",
+        availability: {
+          Mon: { H: false, F: true },
+          Tue: { H: false, F: false },
+          Wed: { H: false, F: true },
+          Thu: { H: false, F: false },
+          Fri: { H: false, F: false },
+          Sat: { H: false, F: false },
+          Sun: { H: false, F: false }
+        }
+      },
+      {
+        id: "ms_jackie",
+        name: "Ms. Jackie",
+        isLead: false,
+        maxHoursPerWeek: 8,
+        color: "#BAE1FF",
+        availability: {
+          Mon: { H: false, F: false },
+          Tue: { H: true,  F: false },  // H-6-7
+          Wed: { H: false, F: false },
+          Thu: { H: true,  F: false },
+          Fri: { H: false, F: false },
+          Sat: { H: true,  F: false },  // H-11-12
+          Sun: { H: false, F: false }
+        }
+      },
+      {
+        id: "sydney",
+        name: "Sydney",
+        isLead: false,
+        maxHoursPerWeek: 8,
+        color: "#FFFFBA",
+        availability: {
+          Mon: { H: false, F: false },
+          Tue: { H: true,  F: false },
+          Wed: { H: false, F: false },
+          Thu: { H: true,  F: false },
+          Fri: { H: false, F: false },
+          Sat: { H: true,  F: false },
+          Sun: { H: false, F: false }
+        }
+      },
+      {
+        id: "pearl",
+        name: "Pearl",
+        isLead: false,
+        maxHoursPerWeek: 12,
+        color: "#FFD9BA",
+        availability: {
+          Mon: { H: false, F: false },
+          Tue: { H: false, F: true },   // F-4-5
+          Wed: { H: true,  F: false },  // H-5-8:30
+          Thu: { H: false, F: true },   // F-4-5
+          Fri: { H: false, F: false },
+          Sat: { H: true,  F: false },  // H-9-12
+          Sun: { H: false, F: false }
+        }
+      },
+      {
+        id: "madina",
+        name: "Madina",
+        isLead: false,
+        maxHoursPerWeek: 8,
+        color: "#E0BBE4",
+        availability: {
+          Mon: { H: true,  F: false },
+          Tue: { H: false, F: false },
+          Wed: { H: false, F: false },
+          Thu: { H: true,  F: false },
+          Fri: { H: false, F: false },
+          Sat: { H: false, F: false },
+          Sun: { H: false, F: false }
+        }
+      },
+      {
+        id: "emonie",
+        name: "Emonie",
+        isLead: false,
+        maxHoursPerWeek: 12,
+        color: "#FFDFD3",
+        availability: {
+          Mon: { H: true,  F: false },  // Yes
+          Tue: { H: false, F: true },   // F-5-8:30
+          Wed: { H: true,  F: false },  // Yes
+          Thu: { H: false, F: true },   // F-5-8:30
+          Fri: { H: false, F: false },
+          Sat: { H: false, F: false },
+          Sun: { H: false, F: false }
+        }
+      },
+      {
+        id: "james",
+        name: "James",
+        isLead: false,
+        maxHoursPerWeek: 12,
+        color: "#C7CEEA",
+        availability: {
+          Mon: { H: true,  F: false },  // Yes
+          Tue: { H: true,  F: false },  // H-5-8:30
+          Wed: { H: false, F: true },   // F-5-8:30
+          Thu: { H: false, F: false },
+          Fri: { H: false, F: false },
+          Sat: { H: false, F: false },
+          Sun: { H: false, F: false }
+        }
+      },
+      {
+        id: "keith",
+        name: "Keith",
+        isLead: false,
+        maxHoursPerWeek: 10,
+        color: "#B5EAD7",
+        availability: {
+          Mon: { H: true,  F: false },
+          Tue: { H: false, F: true },
+          Wed: { H: false, F: false },
+          Thu: { H: false, F: true },
+          Fri: { H: false, F: false },
+          Sat: { H: false, F: false },
+          Sun: { H: false, F: false }
+        }
+      },
+      {
+        id: "ms_sabrina",
+        name: "Ms. Sabrina",
+        isLead: false,
+        maxHoursPerWeek: 10,
+        color: "#FFDAC1",
+        availability: {
+          Mon: { H: false, F: false },
+          Tue: { H: true,  F: true },   // F / H
+          Wed: { H: false, F: false },
+          Thu: { H: true,  F: true },   // F / H
+          Fri: { H: false, F: false },
+          Sat: { H: true,  F: false },  // H
+          Sun: { H: false, F: false }
+        }
+      },
+      {
+        id: "michael",
+        name: "Michael",
+        isLead: false,
+        maxHoursPerWeek: 16,
+        color: "#C9E4DE",
+        availability: {
+          Mon: { H: false, F: true },   // F-5-8:30
+          Tue: { H: true,  F: true },   // Yes
+          Wed: { H: true,  F: false },  // H-5-8:30
+          Thu: { H: true,  F: true },   // Yes
+          Fri: { H: true,  F: false },  // H-4-6
+          Sat: { H: false, F: false },
+          Sun: { H: false, F: false }
+        }
+      },
+      {
+        id: "katrina",
+        name: "Katrina",
+        isLead: false,
+        maxHoursPerWeek: 8,
+        color: "#F7D9C4",
+        availability: {
+          Mon: { H: true,  F: false },  // H-6-8:30
+          Tue: { H: false, F: false },
+          Wed: { H: true,  F: false },  // H-6-8:30
+          Thu: { H: false, F: false },
+          Fri: { H: false, F: false },
+          Sat: { H: false, F: false },
+          Sun: { H: false, F: false }
+        }
+      }
+    ];
+
+    const LOCATIONS = [
+      { id: "H", name: "Hazelwood", minStaff: 3, maxStaff: 4 }, // Lead + 2–3 others
+      { id: "F", name: "Florissant", minStaff: 1, maxStaff: 2 } // Lead + maybe 1 other
+    ];
+
+    const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const WEEKDAY_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
+
+    // schedule[isoDate][locationId] = { leadId: string|null, staffIds: [] }
+    let schedule = {};
+
+    // current month/year selection
+    let currentYear, currentMonth; // JS month index (0-11)
+
+    // local storage key
+    const STORAGE_KEY = "wmaa-scheduler-v1";
+
+    // ---------- INIT ----------
+
+    function init() {
+      const now = new Date();
+      currentYear = now.getFullYear();
+      currentMonth = now.getMonth();
+
+      loadFromStorage();
+      buildLegend();
+      buildStaffSelect();
+      updateMonthLabel();
+      renderCalendar();
+      renderStaffShifts();
+
+      document.getElementById("generateBtn").addEventListener("click", () => {
+        generateMonth();
+        saveToStorage();
+        renderCalendar();
+        renderStaffShifts();
+        showToast();
+      });
+      document.getElementById("prevMonthBtn").addEventListener("click", () => {
+        changeMonth(-1);
+      });
+      document.getElementById("nextMonthBtn").addEventListener("click", () => {
+        changeMonth(1);
+      });
+      document.getElementById("staffSelect").addEventListener("change", renderStaffShifts);
+    }
+
+    function changeMonth(delta) {
+      currentMonth += delta;
+      if (currentMonth < 0) {
+        currentMonth = 11;
+        currentYear--;
+      } else if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
+      updateMonthLabel();
+      renderCalendar();
+      renderStaffShifts();
+    }
+
+    function updateMonthLabel() {
+      const monthLabel = document.getElementById("monthLabel");
+      const formatter = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" });
+      monthLabel.textContent = formatter.format(new Date(currentYear, currentMonth, 1));
+    }
+
+    function buildLegend() {
+      const legendRow = document.getElementById("legendRow");
+      legendRow.innerHTML = "";
+      STAFF.forEach(s => {
+        const pill = document.createElement("div");
+        pill.className = "pill";
+        const dot = document.createElement("span");
+        dot.className = "dot";
+        dot.style.background = s.color;
+        pill.appendChild(dot);
+        const text = document.createElement("span");
+        text.textContent = s.name + (s.isLead ? " (Lead)" : "");
+        pill.appendChild(text);
+        legendRow.appendChild(pill);
+      });
+    }
+
+    function buildStaffSelect() {
+      const select = document.getElementById("staffSelect");
+      select.innerHTML = "";
+      STAFF.forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.name;
+        select.appendChild(opt);
+      });
+    }
+
+    // ---------- SCHEDULE GENERATION ----------
+
+    function generateMonth() {
+      schedule = schedule || {};
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const hoursTracker = {}; // staffId -> minutes this month (simple approximation)
+
+      STAFF.forEach(s => (hoursTracker[s.id] = 0));
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(currentYear, currentMonth, day);
+        const iso = date.toISOString().slice(0, 10);
+        const weekday = WEEKDAYS[date.getDay()];
+
+        if (!schedule[iso]) schedule[iso] = {};
+
+        LOCATIONS.forEach(loc => {
+          const shiftMinutes = 4 * 60; // treat as a 4-hour block for now
+          const available = STAFF.filter(s => s.availability[weekday] && s.availability[weekday][loc.id]);
+
+          // pick lead
+          const leadCandidates = available.filter(s => s.isLead);
+          const leadSorted = leadCandidates.sort((a, b) => hoursTracker[a.id] - hoursTracker[b.id]);
+          const lead = leadSorted[0] || null;
+
+          // non-lead staff
+          const nonLeadCandidates = available.filter(s => !s.isLead);
+          const nonLeadSorted = nonLeadCandidates.sort((a, b) => hoursTracker[a.id] - hoursTracker[b.id]);
+
+          const requiredCount = loc.minStaff; // includes lead in this simple model
+          const maxCount = loc.maxStaff;
+
+          const assignedStaffIds = [];
+          let leadId = null;
+
+          if (lead) {
+            leadId = lead.id;
+            assignedStaffIds.push(lead.id);
+            hoursTracker[lead.id] += shiftMinutes;
+          }
+
+          let idx = 0;
+          while (assignedStaffIds.length < requiredCount && idx < nonLeadSorted.length) {
+            const s = nonLeadSorted[idx++];
+            if (!assignedStaffIds.includes(s.id)) {
+              assignedStaffIds.push(s.id);
+              hoursTracker[s.id] += shiftMinutes;
+            }
+          }
+
+          // optional: try to add up to maxCount if people exist
+          while (assignedStaffIds.length < maxCount && idx < nonLeadSorted.length) {
+            const s = nonLeadSorted[idx++];
+            if (!assignedStaffIds.includes(s.id)) {
+              assignedStaffIds.push(s.id);
+              hoursTracker[s.id] += shiftMinutes;
+            }
+          }
+
+          schedule[iso][loc.id] = {
+            leadId: leadId,
+            staffIds: assignedStaffIds.filter(id => id !== leadId)
+          };
+        });
+      }
+    }
+
+    // ---------- RENDER CALENDAR GRID ----------
+
+    function renderCalendar() {
+      const grid = document.getElementById("calendarGrid");
+      grid.innerHTML = "";
+
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+
+      // header row (Sun-Sat)
+      const headerRow = document.createElement("div");
+      headerRow.className = "calendar-header-row";
+
+      const spacer = document.createElement("div");
+      spacer.className = "calendar-header-cell";
+      spacer.textContent = "Location";
+      headerRow.appendChild(spacer);
+
+      for (let i = 0; i < 7; i++) {
+        const cell = document.createElement("div");
+        cell.className = "calendar-header-cell";
+        const weekdayLabel = document.createElement("div");
+        weekdayLabel.className = "weekday-label";
+        weekdayLabel.textContent = WEEKDAY_SHORT[i];
+        const fullLabel = document.createElement("div");
+        fullLabel.className = "small" + ((i === 0 || i === 6) ? " weekday-weekend" : "");
+        fullLabel.textContent = WEEKDAYS[i];
+        cell.appendChild(weekdayLabel);
+        cell.appendChild(fullLabel);
+        headerRow.appendChild(cell);
+      }
+      grid.appendChild(headerRow);
+
+      // For each location, create a row with 7-day segments (we'll show first 7, and dates inside)
+      LOCATIONS.forEach(loc => {
+        const row = document.createElement("div");
+        row.className = "calendar-row";
+
+        const label = document.createElement("div");
+        label.className = "calendar-row-label";
+        label.textContent = loc.name;
+        row.appendChild(label);
+
+        // We'll show the entire month compressed into weekly slots: each cell shows dates in that weekday slot
+        for (let weekdayIdx = 0; weekdayIdx < 7; weekdayIdx++) {
+          const cell = document.createElement("div");
+          cell.className = "calendar-cell";
+
+          // For this weekday, list assigned staff initials for all dates in the month that fall on this weekday
+          const inner = document.createElement("div");
+          inner.style.display = "flex";
+          inner.style.flexDirection = "column";
+          inner.style.gap = "2px";
+          inner.style.alignItems = "center";
+
+          for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(currentYear, currentMonth, day);
+            if (date.getDay() !== weekdayIdx) continue;
+            const iso = date.toISOString().slice(0, 10);
+            const dayBox = document.createElement("div");
+            dayBox.style.display = "flex";
+            dayBox.style.alignItems = "center";
+            dayBox.style.gap = "4px";
+            const dayNum = document.createElement("span");
+            dayNum.className = "small";
+            dayNum.textContent = day;
+            dayBox.appendChild(dayNum);
+
+            const shift = (schedule[iso] && schedule[iso][loc.id]) || null;
+            if (shift && (shift.leadId || (shift.staffIds && shift.staffIds.length))) {
+              const badge = document.createElement("span");
+              badge.className = "badge";
+              badge.textContent = formatShiftBadge(shift);
+              dayBox.appendChild(badge);
+            }
+
+            inner.appendChild(dayBox);
+          }
+
+          cell.appendChild(inner);
+          row.appendChild(cell);
+        }
+
+        grid.appendChild(row);
+      });
+    }
+
+    function formatShiftBadge(shift) {
+      const initials = [];
+      if (shift.leadId) {
+        const s = STAFF.find(x => x.id === shift.leadId);
+        if (s) initials.push(getInitials(s.name) + "*");
+      }
+      (shift.staffIds || []).forEach(id => {
+        const s = STAFF.find(x => x.id === id);
+        if (s) initials.push(getInitials(s.name));
+      });
+      return initials.join(", ");
+    }
+
+    function getInitials(name) {
+      return name.split(" ").map(p => p[0]).join("").toUpperCase();
+    }
+
+    // ---------- STAFF VIEW RENDER ----------
+
+    function renderStaffShifts() {
+      const staffId = document.getElementById("staffSelect").value;
+      const list = document.getElementById("staffShiftList");
+      list.innerHTML = "";
+
+      if (!staffId) return;
+
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const formatter = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+      const items = [];
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(currentYear, currentMonth, day);
+        const iso = date.toISOString().slice(0, 10);
+        const daySchedule = schedule[iso] || {};
+        LOCATIONS.forEach(loc => {
+          const locShift = daySchedule[loc.id];
+          if (!locShift) return;
+
+          const isLead = locShift.leadId === staffId;
+          const isStaff = locShift.staffIds && locShift.staffIds.includes(staffId);
+          if (!isLead && !isStaff) return;
+
+          items.push({
+            iso,
+            dateObj: date,
+            locationId: loc.id,
+            locationName: loc.name,
+            isLead
+          });
+        });
+      }
+
+      items.sort((a, b) => a.dateObj - b.dateObj);
+
+      if (!items.length) {
+        const empty = document.createElement("div");
+        empty.className = "small";
+        empty.textContent = "No shifts assigned this month.";
+        list.appendChild(empty);
+        return;
+      }
+
+      items.forEach(item => {
+        const el = document.createElement("div");
+        el.className = "shift-item";
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+
+        const title = document.createElement("span");
+        title.textContent = formatter.format(item.dateObj);
+        meta.appendChild(title);
+
+        const subtitle = document.createElement("span");
+        subtitle.textContent = `${item.locationName} · Evening block`;
+        meta.appendChild(subtitle);
+
+        el.appendChild(meta);
+
+        const chips = document.createElement("div");
+        chips.style.display = "flex";
+        chips.style.gap = "0.3rem";
+
+        const locChip = document.createElement("span");
+        locChip.className = "chip " + (item.locationId === "H" ? "location-h" : "location-f");
+        locChip.textContent = item.locationId;
+        chips.appendChild(locChip);
+
+        const roleChip = document.createElement("span");
+        roleChip.className = "chip " + (item.isLead ? "lead" : "");
+        roleChip.textContent = item.isLead ? "Lead" : "Staff";
+        chips.appendChild(roleChip);
+
+        el.appendChild(chips);
+
+        list.appendChild(el);
+      });
+    }
+
+    // ---------- STORAGE & TOAST ----------
+
+    function saveToStorage() {
+      try {
+        const payload = {
+          schedule,
+          year: currentYear,
+          month: currentMonth
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (e) {
+        console.warn("Failed to save schedule:", e);
+      }
+    }
+
+    function loadFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        schedule = data.schedule || {};
+        currentYear = data.year || currentYear;
+        currentMonth = (typeof data.month === "number") ? data.month : currentMonth;
+      } catch (e) {
+        console.warn("Failed to load schedule:", e);
+      }
+    }
+
+    function showToast() {
+      const toast = document.getElementById("toast");
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2200);
+    }
+
+    // ---------- PWA REGISTRATION ----------
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("service-worker.js").catch(console.error);
+      });
+    }
+
+    // Boot
+    init();
+  </script>
+</body>
+</html>
